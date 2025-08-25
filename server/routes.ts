@@ -6,16 +6,16 @@ import { insertReportSchema } from "@shared/schema";
 import { z } from "zod";
 
 // Configure multer for memory storage
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB to fit Vercel limits
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'), false);
+      cb(new Error("Only image files are allowed"), false);
     }
-  }
+  },
 });
 
 // Mock Google Vision API analysis
@@ -26,23 +26,25 @@ async function analyzeImageContent(imageBuffer: Buffer): Promise<string> {
     "Billboard contains commercial advertisement for consumer products",
     "Digital display showing promotional content",
     "Large format outdoor advertising sign",
-    "Highway billboard with commercial messaging"
+    "Highway billboard with commercial messaging",
   ];
-  
+
   return mockAnalyses[Math.floor(Math.random() * mockAnalyses.length)];
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/reports - Submit new report
-  app.post("/api/reports", upload.single('image'), async (req, res) => {
+  app.post("/api/reports", upload.single("image"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "Image file is required" });
       }
 
       // Convert image to base64 URL for storage (in production, upload to cloud storage)
-      const imageUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-      
+      const imageUrl = `data:${
+        req.file.mimetype
+      };base64,${req.file.buffer.toString("base64")}`;
+
       // Analyze image content
       const aiAnalysis = await analyzeImageContent(req.file.buffer);
 
@@ -52,7 +54,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         latitude: parseFloat(req.body.latitude),
         longitude: parseFloat(req.body.longitude),
         timestamp: new Date().toISOString(),
-        aiAnalysis
+        aiAnalysis,
       };
 
       const validatedData = insertReportSchema.parse(reportData);
@@ -61,9 +63,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(report);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Validation failed", 
-          errors: error.errors 
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: error.errors,
         });
       }
       console.error("Error creating report:", error);
@@ -109,13 +111,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { status } = req.body;
-      
+
       if (!["Pending", "Under Review", "Resolved"].includes(status)) {
         return res.status(400).json({ message: "Invalid status value" });
       }
 
       const updatedReport = await storage.updateReportStatus(id, status);
-      
+
       if (!updatedReport) {
         return res.status(404).json({ message: "Report not found" });
       }
